@@ -84,6 +84,7 @@ def _objects_for_export(context):
     bones = bones_from_armature(skeleton)
     bone_lookup = _bone_index_lookup(bones)
     _validate_vertex_weight_counts(meshes, bone_lookup)
+    _validate_uv_layer_counts(meshes)
 
     return skeleton, meshes, bones, bone_lookup
 
@@ -131,6 +132,11 @@ def _loop_uv(uv_layer, loop_index):
     if abs(u) > 1024.0 or abs(v) > 1024.0:
         return None
     return (u, v)
+
+
+def _uv_layers(mesh):
+    layers = list(mesh.uv_layers)
+    return tuple((layers + [None, None, None])[:3])
 
 
 def _material_index_for_slot(material, materials, material_lookup):
@@ -285,6 +291,18 @@ def _validate_vertex_weight_counts(objects, bone_lookup):
         )
 
 
+def _validate_uv_layer_counts(objects):
+    offenders = [
+        f"{obj.name} ({len(obj.data.uv_layers)} UV maps)"
+        for obj in objects
+        if len(obj.data.uv_layers) > 3
+    ]
+    if offenders:
+        raise CmbMeshExportError(
+            "Mesh(es) " + ", ".join(offenders) + " contain more than 3 UV maps!"
+        )
+
+
 def _normal_matrix(matrix):
     matrix3 = matrix.to_3x3()
     try:
@@ -308,7 +326,7 @@ def _append_object_mesh(
     mesh = obj.data
 
     mesh.calc_loop_triangles()
-    uv_layer = mesh.uv_layers.active
+    uv_layers = _uv_layers(mesh)
     color_layer = _active_color_layer(mesh)
     object_materials = _object_material_indices(obj, materials, material_lookup)
     mesh_to_armature = skeleton.matrix_world.inverted() @ obj.matrix_world
@@ -338,7 +356,9 @@ def _append_object_mesh(
                 position=(float(position.x), float(position.y), float(position.z)),
                 normal=(float(normal.x), float(normal.y), float(normal.z)),
                 color=_loop_color(mesh, color_layer, loop_index, loop.vertex_index),
-                uv0=_loop_uv(uv_layer, loop_index),
+                uv0=_loop_uv(uv_layers[0], loop_index),
+                uv1=_loop_uv(uv_layers[1], loop_index),
+                uv2=_loop_uv(uv_layers[2], loop_index),
                 bone_indices=bone_indices,
                 bone_weights=bone_weights,
             )

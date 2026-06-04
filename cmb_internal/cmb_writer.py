@@ -69,7 +69,9 @@ class ShapeWriteInfo:
     bone_dimension: int
     skinning_mode: int
     has_colors: bool
-    uv0_scale: float
+    uv_offsets: tuple[int, int, int]
+    uv_scales: tuple[float, float, float]
+    has_uvs: tuple[bool, bool, bool]
 
 
 @dataclass(frozen=True)
@@ -87,13 +89,13 @@ class VatrLayout:
     positions_size: int
     normals_size: int
     colors_size: int
-    uv0_size: int
+    uv_sizes: tuple[int, int, int]
     bone_indices_size: int
     bone_weights_size: int
     positions_offset: int
     normals_offset: int
     colors_offset: int
-    uv0_offset: int
+    uv_offsets: tuple[int, int, int]
     bone_indices_offset: int
     bone_weights_offset: int
 
@@ -567,6 +569,8 @@ def _vertex_for_skinning_mode(model, vertex, skinning_mode, bone_palette):
         normal=None if normal is None else _normalize_vector(_transform_vector(inverse_bind_matrix, normal)),
         color=vertex.color,
         uv0=vertex.uv0,
+        uv1=vertex.uv1,
+        uv2=vertex.uv2,
         bone_indices=vertex.bone_indices,
         bone_weights=vertex.bone_weights,
     )
@@ -585,6 +589,8 @@ def _vertex_for_prms(model, vertex, skinning_mode, bone_palette):
         normal=vertex.normal,
         color=vertex.color,
         uv0=vertex.uv0,
+        uv1=vertex.uv1,
+        uv2=vertex.uv2,
         bone_indices=tuple(palette_lookup.get(bone_index, 0) for bone_index in vertex.bone_indices),
         bone_weights=vertex.bone_weights,
     )
@@ -594,10 +600,10 @@ def _align4_size(size):
     return (size + 3) & ~3
 
 
-def _shape_uv0_scale(vertices):
+def _shape_uv_scale(vertices, uv_name):
     max_abs = 0.0
     for vertex in vertices:
-        uv = vertex.uv0 or (0.0, 0.0)
+        uv = getattr(vertex, uv_name) or (0.0, 0.0)
         if not isfinite(uv[0]) or not isfinite(uv[1]):
             continue
         max_abs = max(max_abs, abs(uv[0]), abs(uv[1]))
@@ -611,6 +617,7 @@ def _build_shape_write_info(model):
     vertex_start = 0
     index_start = 0
     bone_data_start = 0
+    uv_data_starts = [0, 0, 0]
     split_counts = {}
 
     for primitive in model.primitives:
@@ -669,6 +676,15 @@ def _build_shape_write_info(model):
         shape_skinning_mode = 0 if all(prm.skinning_mode == 0 for prm in prms) else 2
         shape_palette = chunk_palettes[0] if shape_skinning_mode == 0 and chunk_palettes else (0,)
         bounds_min, bounds_max = _bounds_from_vertices(local_vertices)
+        has_uvs = tuple(
+            any(getattr(vertex, f"uv{uv_index}") is not None for vertex in local_vertices)
+            for uv_index in range(3)
+        )
+        uv_offsets = tuple(uv_data_starts)
+        uv_scales = tuple(
+            _shape_uv_scale(local_vertices, f"uv{uv_index}")
+            for uv_index in range(3)
+        )
         shapes.append(
             ShapeWriteInfo(
                 primitive=primitive,
@@ -683,9 +699,14 @@ def _build_shape_write_info(model):
                 bone_dimension=bone_dimension,
                 skinning_mode=shape_skinning_mode,
                 has_colors=any(vertex.color is not None for vertex in local_vertices),
-                uv0_scale=_shape_uv0_scale(local_vertices),
+                uv_offsets=uv_offsets,
+                uv_scales=uv_scales,
+                has_uvs=has_uvs,
             )
         )
+        for uv_index, has_uv in enumerate(has_uvs):
+            if has_uv:
+                uv_data_starts[uv_index] += len(local_vertices) * 4
         vertex_start += len(local_vertices)
         if shape_skinning_mode != 0:
             bone_data_start += len(local_vertices) * bone_dimension
@@ -699,7 +720,10 @@ def _build_vatr_layout(shapes):
     positions_size = total_vertices * 12
     normals_size = _align4_size(total_vertices * 3)
     colors_size = total_vertices * 4 if has_colors else 0
-    uv0_size = total_vertices * 4
+    uv_sizes = tuple(
+        sum(len(shape.vertices) * 4 for shape in shapes if shape.has_uvs[uv_index])
+        for uv_index in range(3)
+    )
     bone_indices_raw_size = sum(
         len(shape.vertices) * shape.bone_dimension
         for shape in shapes
@@ -710,8 +734,12 @@ def _build_vatr_layout(shapes):
     positions_offset = 0x4C
     normals_offset = positions_offset + positions_size
     colors_offset = normals_offset + normals_size
-    uv0_offset = colors_offset + colors_size
-    bone_indices_offset = uv0_offset + uv0_size
+    uv_offsets = (
+        colors_offset + colors_size,
+        colors_offset + colors_size + uv_sizes[0],
+        colors_offset + colors_size + uv_sizes[0] + uv_sizes[1],
+    )
+    bone_indices_offset = uv_offsets[2] + uv_sizes[2]
     bone_weights_offset = bone_indices_offset + bone_indices_size
     return VatrLayout(
         total_vertices=total_vertices,
@@ -719,13 +747,13 @@ def _build_vatr_layout(shapes):
         positions_size=positions_size,
         normals_size=normals_size,
         colors_size=colors_size,
-        uv0_size=uv0_size,
+        uv_sizes=uv_sizes,
         bone_indices_size=bone_indices_size,
         bone_weights_size=bone_weights_size,
         positions_offset=positions_offset,
         normals_offset=normals_offset,
         colors_offset=colors_offset,
-        uv0_offset=uv0_offset,
+        uv_offsets=uv_offsets,
         bone_indices_offset=bone_indices_offset,
         bone_weights_offset=bone_weights_offset,
     )
@@ -794,7 +822,11 @@ def _write_prms_chunk(writer, prms):
 def _write_sepd_chunk(writer, shape, vatr_layout):
     start, size_offset = _start_chunk(writer, SEPD_MAGIC)
     writer.write_u16(len(shape.prms))
-    flags = SepdFlags.HAS_POSITION | SepdFlags.HAS_NORMALS | SepdFlags.HAS_UV0
+    flags = SepdFlags.HAS_POSITION | SepdFlags.HAS_NORMALS
+    uv_flags = (SepdFlags.HAS_UV0, SepdFlags.HAS_UV1, SepdFlags.HAS_UV2)
+    for has_uv, uv_flag in zip(shape.has_uvs, uv_flags):
+        if has_uv:
+            flags |= uv_flag
     if shape.has_colors:
         flags |= SepdFlags.HAS_COLORS
     if shape.skinning_mode != 0:
@@ -806,7 +838,6 @@ def _write_sepd_chunk(writer, shape, vatr_layout):
     position_offset = shape.vertex_start * 12
     normal_offset = shape.vertex_start * 3
     color_offset = shape.vertex_start * 4 if vatr_layout.has_colors and shape.has_colors else 0
-    uv0_offset = shape.vertex_start * 4
     bone_indices_offset = shape.bone_data_start if shape.skinning_mode != 0 else 0
     bone_weights_offset = shape.bone_data_start if shape.skinning_mode != 0 else 0
 
@@ -816,9 +847,13 @@ def _write_sepd_chunk(writer, shape, vatr_layout):
         _write_vertex_list(writer, color_offset, 1.0 / 255.0, PicaDataType.U8)
     else:
         _write_vertex_list(writer, 0, 1.0, PicaDataType.F32)
-    _write_vertex_list(writer, uv0_offset, shape.uv0_scale, PicaDataType.S16)
-    _write_vertex_list(writer, 0, 1.0, PicaDataType.F32)
-    _write_vertex_list(writer, 0, 1.0, PicaDataType.F32)
+    for has_uv, uv_offset, uv_scale in zip(
+        shape.has_uvs, shape.uv_offsets, shape.uv_scales
+    ):
+        if has_uv:
+            _write_vertex_list(writer, uv_offset, uv_scale, PicaDataType.S16)
+        else:
+            _write_vertex_list(writer, 0, 1.0, PicaDataType.F32)
     if shape.skinning_mode != 0:
         _write_vertex_list(writer, bone_indices_offset, 1.0, PicaDataType.U8)
         _write_vertex_list(writer, bone_weights_offset, 0.01, PicaDataType.U8)
@@ -916,10 +951,8 @@ def _write_vatr_chunk(writer, shapes, vatr_layout):
     _write_vatr_entry(writer, vatr_layout.positions_size, vatr_layout.positions_offset)
     _write_vatr_entry(writer, vatr_layout.normals_size, vatr_layout.normals_offset)
     _write_vatr_entry(writer, vatr_layout.colors_size, vatr_layout.colors_offset)
-    _write_vatr_entry(writer, vatr_layout.uv0_size, vatr_layout.uv0_offset)
-    current_end = vatr_layout.uv0_offset + vatr_layout.uv0_size
-    _write_vatr_entry(writer, 0, current_end)
-    _write_vatr_entry(writer, 0, current_end)
+    for uv_size, uv_offset in zip(vatr_layout.uv_sizes, vatr_layout.uv_offsets):
+        _write_vatr_entry(writer, uv_size, uv_offset)
     _write_vatr_entry(writer, vatr_layout.bone_indices_size, vatr_layout.bone_indices_offset)
     _write_vatr_entry(writer, vatr_layout.bone_weights_size, vatr_layout.bone_weights_offset)
 
@@ -934,14 +967,17 @@ def _write_vatr_chunk(writer, shapes, vatr_layout):
     if vatr_layout.has_colors:
         for vertex in _iter_shape_vertices(shapes):
             writer.write_rgba8(vertex.color or (255, 255, 255, 255))
-    for shape in shapes:
-        uv_scale = shape.uv0_scale
-        for vertex in shape.vertices:
-            uv = vertex.uv0 or (0.0, 0.0)
-            if not isfinite(uv[0]) or not isfinite(uv[1]):
-                uv = (0.0, 0.0)
-            writer.write_s16(_clamp_int(uv[0] / uv_scale, -32768, 32767))
-            writer.write_s16(_clamp_int(uv[1] / uv_scale, -32768, 32767))
+    for uv_index in range(3):
+        for shape in shapes:
+            if not shape.has_uvs[uv_index]:
+                continue
+            uv_scale = shape.uv_scales[uv_index]
+            for vertex in shape.vertices:
+                uv = getattr(vertex, f"uv{uv_index}") or (0.0, 0.0)
+                if not isfinite(uv[0]) or not isfinite(uv[1]):
+                    uv = (0.0, 0.0)
+                writer.write_s16(_clamp_int(uv[0] / uv_scale, -32768, 32767))
+                writer.write_s16(_clamp_int(uv[1] / uv_scale, -32768, 32767))
     for shape in shapes:
         if shape.skinning_mode == 0:
             continue

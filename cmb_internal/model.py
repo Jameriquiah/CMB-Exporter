@@ -18,6 +18,8 @@ class CmbVertex:
     normal: tuple[float, float, float] | None = None
     color: tuple[int, int, int, int] | None = None
     uv0: tuple[float, float] | None = None
+    uv1: tuple[float, float] | None = None
+    uv2: tuple[float, float] | None = None
     bone_indices: tuple[int, int, int, int] = (0, 0, 0, 0)
     bone_weights: tuple[int, int, int, int] = (100, 0, 0, 0)
 
