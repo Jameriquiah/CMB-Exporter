@@ -1,0 +1,158 @@
+from enum import IntEnum, IntFlag
+
+
+CMB_VERSION_OOT3D = 0x6
+
+CMB_MAGIC = b"cmb "
+SKL_MAGIC = b"skl "
+MATS_MAGIC = b"mats"
+TEX_MAGIC = b"tex "
+SKLM_MAGIC = b"sklm"
+MSHS_MAGIC = b"mshs"
+SHP_MAGIC = b"shp "
+SEPD_MAGIC = b"sepd"
+PRMS_MAGIC = b"prms"
+PRM_MAGIC = b"prm "
+LUTS_MAGIC = b"luts"
+VATR_MAGIC = b"vatr"
+
+
+class PicaDataType(IntEnum):
+    S8 = 0x1400
+    U8 = 0x1401
+    S16 = 0x1402
+    U16 = 0x1403
+    S32 = 0x1404
+    U32 = 0x1405
+    F32 = 0x1406
+    UNSIGNED_BYTE_44_DMP = 0x6760
+    UNSIGNED_4_BITS_DMP = 0x6761
+    UNSIGNED_SHORT_5551 = 0x8034
+    UNSIGNED_SHORT_565 = 0x8363
+
+
+class TextureMinFilter(IntEnum):
+    NEAREST = 0x2600
+    LINEAR = 0x2601
+    NEAREST_MIPMAP_NEAREST = 0x2700
+    LINEAR_MIPMAP_NEAREST = 0x2701
+    NEAREST_MIPMAP_LINEAR = 0x2702
+    LINEAR_MIPMAP_LINEAR = 0x2703
+
+
+class TextureMagFilter(IntEnum):
+    NEAREST = 0x2600
+    LINEAR = 0x2601
+
+
+class TextureWrapMode(IntEnum):
+    CLAMP = 0x2900
+    REPEAT = 0x2901
+    CLAMP_TO_BORDER = 0x812D
+    CLAMP_TO_EDGE = 0x812F
+    MIRRORED_REPEAT = 0x8370
+
+
+class PicaTextureFormat(IntEnum):
+    RGBA_NATIVE_DMP = 0x6752
+    RGB_NATIVE_DMP = 0x6754
+    ALPHA_NATIVE_DMP = 0x6756
+    LUMINANCE_NATIVE_DMP = 0x6757
+    LUMINANCE_ALPHA_NATIVE_DMP = 0x6758
+    ETC1_RGB8_NATIVE_DMP = 0x675A
+    ETC1_ALPHA_RGB8_A4_NATIVE_DMP = 0x675B
+
+
+class SepdFlags(IntFlag):
+    HAS_POSITION = 0x01
+    HAS_NORMALS = 0x02
+    HAS_COLORS = 0x04
+    HAS_UV0 = 0x08
+    HAS_UV1 = 0x10
+    HAS_UV2 = 0x20
+    HAS_INDICES = 0x40
+    HAS_WEIGHTS = 0x80
+
+
+class PrimitiveMode(IntEnum):
+    TRIANGLES = 0x0000
+
+
+class TestFunction(IntEnum):
+    NEVER = 0x0200
+    LESS = 0x0201
+    EQUAL = 0x0202
+    LEQUAL = 0x0203
+    GREATER = 0x0204
+    NOTEQUAL = 0x0205
+    GEQUAL = 0x0206
+    ALWAYS = 0x0207
+
+
+class BlendFactor(IntEnum):
+    ZERO = 0
+    ONE = 1
+    SRC_COLOR = 0x0300
+    ONE_MINUS_SRC_COLOR = 0x0301
+    SRC_ALPHA = 0x0302
+    ONE_MINUS_SRC_ALPHA = 0x0303
+    DST_ALPHA = 0x0304
+    ONE_MINUS_DST_ALPHA = 0x0305
+    DST_COLOR = 0x0306
+    ONE_MINUS_DST_COLOR = 0x0307
+
+
+class BlendEquation(IntEnum):
+    FUNC_ADD = 0x8006
+    FUNC_SUBTRACT = 0x800A
+    FUNC_REVERSE_SUBTRACT = 0x800B
+
+
+class TextureEnvCombine(IntEnum):
+    REPLACE = 0x1E01
+    MODULATE = 0x2100
+    ADD = 0x0104
+    ADD_SIGNED = 0x8574
+    INTERPOLATE = 0x8575
+    SUBTRACT = 0x84E7
+    DOT3_RGB = 0x86AE
+    DOT3_RGBA = 0x86AF
+    MULT_ADD = 0x6401
+    ADD_MULT = 0x6402
+
+
+class TextureEnvSource(IntEnum):
+    PRIMARY_COLOR = 0x8577
+    FRAGMENT_PRIMARY_COLOR_DMP = 0x6210
+    FRAGMENT_SECONDARY_COLOR_DMP = 0x6211
+    TEXTURE0 = 0x84C0
+    TEXTURE1 = 0x84C1
+    TEXTURE2 = 0x84C2
+    TEXTURE3 = 0x84C3
+    PREVIOUS_BUFFER_DMP = 0x8579
+    CONSTANT = 0x8576
+    PREVIOUS = 0x8578
+
+
+class TextureEnvOperandRgb(IntEnum):
+    SRC_COLOR = 0x0300
+    ONE_MINUS_SRC_COLOR = 0x0301
+    SRC_ALPHA = 0x0302
+    ONE_MINUS_SRC_ALPHA = 0x0303
+    SRC_R_DMP = 0x8580
+    ONE_MINUS_SRC_R_DMP = 0x8583
+    SRC_G_DMP = 0x8581
+    ONE_MINUS_SRC_G_DMP = 0x8584
+    SRC_B_DMP = 0x8582
+    ONE_MINUS_SRC_B_DMP = 0x8585
+
+
+class TextureEnvOperandAlpha(IntEnum):
+    SRC_ALPHA = 0x0302
+    ONE_MINUS_SRC_ALPHA = 0x0303
+    SRC_R_DMP = 0x8580
+    ONE_MINUS_SRC_R_DMP = 0x8583
+    SRC_G_DMP = 0x8581
+    ONE_MINUS_SRC_G_DMP = 0x8584
+    SRC_B_DMP = 0x8582
+    ONE_MINUS_SRC_B_DMP = 0x8585
