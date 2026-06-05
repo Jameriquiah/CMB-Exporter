@@ -3,11 +3,10 @@ from dataclasses import dataclass
 from .texture_slots import TEXTURE_SLOT_INDICES, texture_slot_values
 
 
-PREVIEW_VERSION = 7
+PREVIEW_VERSION = 8
 
 PREVIEW_LIGHT_FLOOR = 0.72
 PREVIEW_AMBIENT_WEIGHT = 0.28
-PREVIEW_HEMISPHERE_BOOST = 0.08
 
 ALPHA_BLEND_MODES = frozenset({"ALPHA", "ADD"})
 CLAMP_WRAP_MODES = frozenset({"CLAMP", "CLAMP_TO_EDGE", "CLAMP_TO_BORDER"})
@@ -60,13 +59,12 @@ def _preview_color(settings):
     ambient = _rgba_tuple(settings.ambient_color)
     emission = _rgba_tuple(settings.emission_color)
 
-    if settings.fragment_lighting or settings.vertex_lighting or settings.hemisphere_lighting:
+    if settings.fragment_lighting or settings.vertex_lighting:
         light = tuple(
             min(
                 1.0,
                 PREVIEW_LIGHT_FLOOR
-                + ambient[index] * PREVIEW_AMBIENT_WEIGHT
-                + (PREVIEW_HEMISPHERE_BOOST if settings.hemisphere_lighting else 0.0),
+                + ambient[index] * PREVIEW_AMBIENT_WEIGHT,
             )
             for index in range(3)
         )
@@ -311,8 +309,8 @@ def _preview_signature(settings):
             tuple(settings.specular1_color),
             settings.fragment_lighting,
             settings.vertex_lighting,
-            settings.hemisphere_lighting,
-            settings.hemisphere_occlusion,
+            settings.is_fog_enabled,
+            settings.render_layer,
             settings.face_culling,
             settings.alpha_test_enabled,
             settings.alpha_reference,

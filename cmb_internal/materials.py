@@ -100,8 +100,8 @@ def material_from_blender(material):
     kwargs.update({
         "fragment_lighting": settings.fragment_lighting,
         "vertex_lighting": settings.vertex_lighting,
-        "hemisphere_lighting": settings.hemisphere_lighting,
-        "hemisphere_occlusion": settings.hemisphere_occlusion,
+        "is_fog_enabled": settings.is_fog_enabled,
+        "render_layer": settings.render_layer,
         "face_culling": settings.face_culling,
         "polygon_offset_enabled": settings.polygon_offset_enabled,
         "polygon_offset": settings.polygon_offset,

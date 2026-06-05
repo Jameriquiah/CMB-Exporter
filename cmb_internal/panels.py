@@ -80,8 +80,12 @@ def draw_lighting_tab(layout, settings):
     col = box.column(align=True)
     col.prop(settings, "fragment_lighting")
     col.prop(settings, "vertex_lighting")
-    col.prop(settings, "hemisphere_lighting")
-    col.prop(settings, "hemisphere_occlusion")
+
+    box = layout.box()
+    box.label(text="Render State")
+    col = box.column(align=True)
+    col.prop(settings, "is_fog_enabled")
+    col.prop(settings, "render_layer")
 
     box = layout.box()
     box.label(text="Geometry")

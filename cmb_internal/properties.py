@@ -278,14 +278,16 @@ class CMBMaterialSettings(bpy.types.PropertyGroup):
         default=False,
         update=update_preview,
     )
-    hemisphere_lighting: bpy.props.BoolProperty(
-        name="Hemisphere Lighting",
+    is_fog_enabled: bpy.props.BoolProperty(
+        name="Fog Enabled",
         default=False,
         update=update_preview,
     )
-    hemisphere_occlusion: bpy.props.BoolProperty(
-        name="Hemisphere Occlusion",
-        default=False,
+    render_layer: bpy.props.IntProperty(
+        name="Render Layer",
+        default=0,
+        min=0,
+        max=255,
         update=update_preview,
     )
     face_culling: bpy.props.BoolProperty(

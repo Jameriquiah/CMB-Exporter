@@ -338,8 +338,8 @@ def _write_mats_chunk(writer, model):
 
         _write_bool(writer, material.fragment_lighting)
         _write_bool(writer, material.vertex_lighting)
-        _write_bool(writer, material.hemisphere_lighting)
-        _write_bool(writer, material.hemisphere_occlusion)
+        _write_bool(writer, material.is_fog_enabled)
+        writer.write_u8(material.render_layer)
         _write_bool(writer, material.face_culling)
         _write_bool(writer, material.polygon_offset_enabled)
         writer.write_u16(material.polygon_offset)

@@ -79,8 +79,8 @@ class CmbMaterial:
     texture2_coord_translation: tuple[float, float] = (0.0, 0.0)
     fragment_lighting: bool = False
     vertex_lighting: bool = False
-    hemisphere_lighting: bool = False
-    hemisphere_occlusion: bool = False
+    is_fog_enabled: bool = False
+    render_layer: int = 0
     face_culling: bool = True
     polygon_offset_enabled: bool = False
     polygon_offset: int = 0

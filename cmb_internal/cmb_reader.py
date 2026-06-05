@@ -202,8 +202,8 @@ class CmbMaterialInfo:
     offset: int
     fragment_lighting: bool
     vertex_lighting: bool
-    hemisphere_lighting: bool
-    hemisphere_occlusion: bool
+    is_fog_enabled: bool
+    render_layer: int
     face_culling: bool
     polygon_offset_enabled: bool
     polygon_offset: int
@@ -658,8 +658,8 @@ def read_mats_info(data, header):
                 offset=material_offset,
                 fragment_lighting=bool(data[material_offset + 0x00]),
                 vertex_lighting=bool(data[material_offset + 0x01]),
-                hemisphere_lighting=bool(data[material_offset + 0x02]),
-                hemisphere_occlusion=bool(data[material_offset + 0x03]),
+                is_fog_enabled=bool(data[material_offset + 0x02]),
+                render_layer=data[material_offset + 0x03],
                 face_culling=bool(data[material_offset + 0x04]),
                 polygon_offset_enabled=bool(data[material_offset + 0x05]),
                 polygon_offset=struct.unpack_from("<H", data, material_offset + 0x06)[0],
