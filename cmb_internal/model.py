@@ -126,6 +126,4 @@ class CmbModel:
 
     @property
     def visibility_id_count(self):
-        if not self.primitives:
-            return 0
-        return max(primitive.visibility_id for primitive in self.primitives) + 1
+        return 48
