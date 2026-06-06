@@ -13,7 +13,6 @@ class CmbMeshExportError(ValueError):
 
 VISIBILITY_ID_PATTERN = re.compile(r"^vis(\d+)_.+")
 MATERIAL_ORDER_PATTERN = re.compile(r"^\s*(\d+)(?=$|[._\-\s\]\)])")
-LAST_DRAW_VISIBILITY_IDS = {25}
 
 
 def _visibility_id_from_name(name):
@@ -45,13 +44,6 @@ def _is_child_of(obj, parent):
     return False
 
 
-def _sort_meshes_for_draw_order(meshes):
-    return sorted(
-        meshes,
-        key=lambda obj: _visibility_id_from_name(obj.name) in LAST_DRAW_VISIBILITY_IDS,
-    )
-
-
 def _objects_for_export(context):
     skeletons = _selected_skeletons(context)
     if not skeletons:
@@ -69,8 +61,6 @@ def _objects_for_export(context):
         raise CmbMeshExportError(
             f"Selected skeleton '{skeleton.name}' has no child mesh objects"
         )
-    meshes = _sort_meshes_for_draw_order(meshes)
-
     multi_material_meshes = [
         obj.name for obj in meshes if len(obj.material_slots) > 1
     ]

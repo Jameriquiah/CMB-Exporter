@@ -415,10 +415,12 @@ def _write_mats_chunk(writer, model):
                 "Internal material writer error: "
                 f"wrote {written:#x} bytes, expected {MATERIAL_RECORD_SIZE:#x}"
             )
+    writer.align(4)
+    writer.patch_u32(size_offset, writer.offset - start)
     for stages in material_envs:
         for stage in stages:
             _write_tex_env_setting(writer, stage)
-    _end_chunk(writer, start, size_offset)
+    writer.align(4)
     return start
 
 
@@ -759,13 +761,27 @@ def _build_vatr_layout(shapes):
     )
 
 
+def _mshs_draw_entries(model, shapes):
+    return sorted(
+        enumerate(shapes),
+        key=lambda item: model.materials[item[1].primitive.material_index].render_layer,
+    )
+
+
 def _write_mshs_chunk(writer, model, shapes):
     start, size_offset = _start_chunk(writer, MSHS_MAGIC)
+    draw_entries = _mshs_draw_entries(model, shapes)
+    render_layer_split = sum(
+        1
+        for _shape_index, shape in draw_entries
+        if model.materials[shape.primitive.material_index].render_layer == 0
+    )
+
     writer.write_u32(len(shapes))
-    writer.write_u16(0)
+    writer.write_u16(render_layer_split)
     writer.write_u16(model.visibility_id_count)
 
-    for shape_index, shape in enumerate(shapes):
+    for shape_index, shape in draw_entries:
         primitive = shape.primitive
         writer.write_u16(shape_index)
         writer.write_u8(primitive.material_index)
