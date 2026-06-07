@@ -229,6 +229,11 @@ class CMB_OT_export(bpy.types.Operator):
             filepath=filepath,
             global_scale=1.0,
             etc_compression_mode=settings.etc_compression_mode,
+            simplified_export=(
+                settings.simplified_export_mode
+                if settings.simplified_export_enabled
+                else "OFF"
+            ),
         )
 
         try:

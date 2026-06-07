@@ -81,7 +81,7 @@ class CmbMaterial:
     vertex_lighting: bool = False
     is_fog_enabled: bool = False
     render_layer: int = 0
-    face_culling: bool = True
+    face_culling: str = "BACK"
     polygon_offset_enabled: bool = False
     polygon_offset: int = 0
     emission_color: tuple[int, int, int, int] = (0, 0, 0, 255)
@@ -126,4 +126,6 @@ class CmbModel:
 
     @property
     def visibility_id_count(self):
-        return 48
+        if not self.primitives:
+            return 0
+        return max(primitive.visibility_id for primitive in self.primitives) + 1

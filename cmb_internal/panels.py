@@ -6,9 +6,6 @@ from .properties import is_cmb_material_settings
 from .texture_slots import TEXTURE_SLOT_INDICES, texture_slot_attr
 
 
-_REORDERED_MATERIAL_PANELS = []
-
-
 def draw_texture_tab(layout, settings):
     box = layout.box()
     box.label(text="Textures")
@@ -178,6 +175,9 @@ class CMB_PT_sidebar(bpy.types.Panel):
         box.label(text="Export")
         box.prop(settings, "filepath")
         box.prop(settings, "etc_compression_mode")
+        box.prop(settings, "simplified_export_enabled")
+        if settings.simplified_export_enabled:
+            box.prop(settings, "simplified_export_mode")
         box.operator("export_scene.cmb")
 
         box = layout.box()
@@ -189,11 +189,11 @@ class CMB_PT_sidebar(bpy.types.Panel):
 
 class MATERIAL_PT_cmb_material_settings(bpy.types.Panel):
     bl_label = "CMB Material"
-    bl_idname = "MATERIAL_PT_cmb_material_settings"
+    bl_idname = "MATERIAL_PT_CMB_Inspector"
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "material"
-    bl_order = -100000
+    bl_options = {"HIDE_HEADER"}
 
     @classmethod
     def poll(cls, context):
@@ -209,76 +209,14 @@ classes = (
 )
 
 
-def _material_panel_class(panel_id):
-    panel = getattr(bpy.types, panel_id, None)
-    if panel is not None:
-        return panel
-    return bpy.types.Panel.bl_rna_get_subclass_py(panel_id, None)
-
-
-def _unregister_builtin_material_panels():
-    panel_ids = (
-        "MATERIAL_PT_preview",
-        "EEVEE_MATERIAL_PT_surface",
-        "EEVEE_MATERIAL_PT_volume",
-        "EEVEE_MATERIAL_PT_displacement",
-        "EEVEE_MATERIAL_PT_thickness",
-        "EEVEE_MATERIAL_PT_settings",
-        "MATERIAL_PT_surface",
-        "MATERIAL_PT_volume",
-        "MATERIAL_PT_displacement",
-        "MATERIAL_PT_thickness",
-        "MATERIAL_PT_settings",
-        "EEVEE_MATERIAL_PT_settings_surface",
-        "EEVEE_MATERIAL_PT_settings_volume",
-        "EEVEE_MATERIAL_PT_viewport_settings",
-        "MATERIAL_PT_lineart",
-        "MATERIAL_PT_viewport",
-        "MATERIAL_PT_animation",
-        "MATERIAL_PT_custom_props",
-    )
-    unregistered = []
-
-    for panel_id in panel_ids:
-        panel_cls = _material_panel_class(panel_id)
-        if panel_cls is None:
-            continue
-        try:
-            bpy.utils.unregister_class(panel_cls)
-        except RuntimeError:
-            continue
-        unregistered.append(panel_cls)
-
-    return unregistered
-
-
-def _restore_builtin_material_panels(panel_classes):
-    top_level = [
-        panel_cls for panel_cls in panel_classes if not getattr(panel_cls, "bl_parent_id", "")
-    ]
-    children = [
-        panel_cls for panel_cls in panel_classes if getattr(panel_cls, "bl_parent_id", "")
-    ]
-    for panel_cls in (*top_level, *children):
-        try:
-            bpy.utils.register_class(panel_cls)
-        except RuntimeError:
-            continue
-
-
 def register():
-    global _REORDERED_MATERIAL_PANELS
-    bpy.utils.register_class(CMB_PT_sidebar)
-    _REORDERED_MATERIAL_PANELS = _unregister_builtin_material_panels()
-    bpy.utils.register_class(MATERIAL_PT_cmb_material_settings)
-    _restore_builtin_material_panels(_REORDERED_MATERIAL_PANELS)
+    for cls in classes:
+        bpy.utils.register_class(cls)
 
 
 def unregister():
-    global _REORDERED_MATERIAL_PANELS
     for cls in reversed(classes):
         try:
             bpy.utils.unregister_class(cls)
         except RuntimeError:
             pass
-    _REORDERED_MATERIAL_PANELS = []

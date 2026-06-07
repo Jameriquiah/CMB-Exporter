@@ -89,7 +89,8 @@ def _uses_texture_alpha(settings):
 
 def _set_material_display_flags(material, settings):
     material.diffuse_color = _preview_color(settings)
-    material.use_backface_culling = bool(settings.face_culling)
+    culling_enabled = settings.face_culling != "NONE"
+    material.use_backface_culling = culling_enabled
 
     if settings.alpha_test_enabled:
         material.alpha_threshold = settings.alpha_reference / 255.0
@@ -105,7 +106,7 @@ def _set_material_display_flags(material, settings):
     if hasattr(material, "use_transparency_overlap"):
         material.use_transparency_overlap = not settings.alpha_test_enabled
     elif hasattr(material, "show_transparent_back"):
-        material.show_transparent_back = not settings.face_culling
+        material.show_transparent_back = not culling_enabled
 
 
 def _set_node_location(node, x, y):

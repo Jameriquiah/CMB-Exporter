@@ -12,6 +12,7 @@ class ExportOptions:
     filepath: str
     global_scale: float
     etc_compression_mode: str = "HIGH"
+    simplified_export: str = "OFF"
 
 
 class CMBExportError(RuntimeError):

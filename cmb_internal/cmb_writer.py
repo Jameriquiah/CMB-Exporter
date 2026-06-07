@@ -225,6 +225,16 @@ def _texture_source(slot):
     )[slot]
 
 
+CULLING_MODE_VALUES = {
+    "FRONT_AND_BACK": 0,
+    "BACK": 1,
+    "FRONT": 2,
+    "NONE": 3,
+    True: 1,
+    False: 3,
+}
+
+
 def _env_stage(
     combine_rgb,
     combine_alpha,
@@ -340,7 +350,7 @@ def _write_mats_chunk(writer, model):
         _write_bool(writer, material.vertex_lighting)
         _write_bool(writer, material.is_fog_enabled)
         writer.write_u8(material.render_layer)
-        _write_bool(writer, material.face_culling)
+        writer.write_u8(CULLING_MODE_VALUES.get(material.face_culling, 1))
         _write_bool(writer, material.polygon_offset_enabled)
         writer.write_u16(material.polygon_offset)
         texture_indices = tuple(
@@ -764,21 +774,24 @@ def _build_vatr_layout(shapes):
 def _mshs_draw_entries(model, shapes):
     return sorted(
         enumerate(shapes),
-        key=lambda item: model.materials[item[1].primitive.material_index].render_layer,
+        key=lambda item: (
+            model.materials[item[1].primitive.material_index].render_layer,
+            item[1].primitive.visibility_id,
+        ),
     )
 
 
 def _write_mshs_chunk(writer, model, shapes):
     start, size_offset = _start_chunk(writer, MSHS_MAGIC)
     draw_entries = _mshs_draw_entries(model, shapes)
-    render_layer_split = sum(
+    opaque_mesh_count = sum(
         1
         for _shape_index, shape in draw_entries
         if model.materials[shape.primitive.material_index].render_layer == 0
     )
 
     writer.write_u32(len(shapes))
-    writer.write_u16(render_layer_split)
+    writer.write_u16(opaque_mesh_count)
     writer.write_u16(model.visibility_id_count)
 
     for shape_index, shape in draw_entries:

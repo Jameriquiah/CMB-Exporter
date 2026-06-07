@@ -3,6 +3,7 @@ from dataclasses import replace
 from math import isfinite
 
 from .materials import default_material, material_from_blender
+from .mesh_groups import link_mesh_group_names, link_mesh_group_visibility_rules
 from .model import CmbModel, CmbPrimitive, CmbVertex
 from .skeleton import bones_from_armature
 
@@ -29,6 +30,42 @@ def _visibility_id_from_name(name):
         )
 
     return visibility_id
+
+
+def _visibility_rules_for_object(obj, options):
+    if options.simplified_export == "OFF":
+        return ((_visibility_id_from_name(obj.name), (0.0, 0.0, 0.0)),)
+
+    visibility_rules = link_mesh_group_visibility_rules(obj.name, options.simplified_export)
+    if visibility_rules is None:
+        valid_names = ", ".join(link_mesh_group_names(options.simplified_export))
+        raise CmbMeshExportError(
+            f"Mesh '{obj.name}' is not a Link mesh."
+        )
+    return visibility_rules
+
+
+def _translated_vertex_indices(source_indices, translation, global_scale, vertices, vertex_lookup):
+    if translation == (0.0, 0.0, 0.0):
+        return source_indices
+
+    translated_indices = []
+    offset = tuple(component * global_scale for component in translation)
+    for source_index in source_indices:
+        vertex = vertices[source_index]
+        translated_position = tuple(
+            vertex.position[axis] + offset[axis]
+            for axis in range(3)
+        )
+        translated_vertex = replace(vertex, position=translated_position)
+        translated_index = vertex_lookup.get(translated_vertex)
+        if translated_index is None:
+            translated_index = len(vertices)
+            vertex_lookup[translated_vertex] = translated_index
+            vertices.append(translated_vertex)
+        translated_indices.append(translated_index)
+
+    return tuple(translated_indices)
 
 
 def _selected_skeletons(context):
@@ -194,6 +231,18 @@ def _sort_materials_by_explicit_order(materials, primitives):
     return sorted_materials, remapped_primitives
 
 
+def _sort_primitives_by_draw_order(materials, primitives):
+    return tuple(
+        sorted(
+            primitives,
+            key=lambda primitive: (
+                materials[primitive.material_index].render_layer,
+                primitive.visibility_id,
+            ),
+        )
+    )
+
+
 def _object_material_indices(obj, materials, material_lookup):
     if not obj.material_slots:
         return [_material_index_for_slot(None, materials, material_lookup)]
@@ -312,7 +361,7 @@ def _append_object_mesh(
     materials,
     material_lookup,
 ):
-    visibility_id = _visibility_id_from_name(obj.name)
+    visibility_rules = _visibility_rules_for_object(obj, options)
     mesh = obj.data
 
     mesh.calc_loop_triangles()
@@ -362,14 +411,22 @@ def _append_object_mesh(
             object_indices.append(vertex_index)
 
     if object_indices:
-        primitives.append(
-            CmbPrimitive(
-                indices=tuple(object_indices),
-                material_index=object_materials[0],
-                visibility_id=visibility_id,
-                mesh_name=obj.name,
+        for visibility_id, translation in visibility_rules:
+            primitive_indices = _translated_vertex_indices(
+                tuple(object_indices),
+                translation,
+                options.global_scale,
+                vertices,
+                vertex_lookup,
             )
-        )
+            primitives.append(
+                CmbPrimitive(
+                    indices=primitive_indices,
+                    material_index=object_materials[0],
+                    visibility_id=visibility_id,
+                    mesh_name=obj.name,
+                )
+            )
 
 
 def build_cmb_model_from_scene(context, options):
@@ -400,11 +457,14 @@ def build_cmb_model_from_scene(context, options):
     sorted_materials, remapped_primitives = _sort_materials_by_explicit_order(
         materials, primitives
     )
+    sorted_primitives = _sort_primitives_by_draw_order(
+        sorted_materials, remapped_primitives
+    )
 
     return CmbModel(
         name=_safe_name(skeleton),
         bones=bones,
         vertices=tuple(vertices),
-        primitives=remapped_primitives,
+        primitives=sorted_primitives,
         materials=sorted_materials,
     )

@@ -79,6 +79,13 @@ TEXTURE_COORD_MAPPING_ITEMS = (
     ("REFLECTION", "Reflection", ""),
 )
 
+CULLING_MODE_ITEMS = (
+    ("FRONT_AND_BACK", "Front And Back", ""),
+    ("BACK", "Back", ""),
+    ("FRONT", "Front", ""),
+    ("NONE", "None", ""),
+)
+
 COMBINER_ITEMS = (
     ("REPLACE", "Replace", ""),
     ("MODULATE", "Modulate", ""),
@@ -290,9 +297,10 @@ class CMBMaterialSettings(bpy.types.PropertyGroup):
         max=255,
         update=update_preview,
     )
-    face_culling: bpy.props.BoolProperty(
-        name="Face Culling",
-        default=True,
+    face_culling: bpy.props.EnumProperty(
+        name="Culling",
+        items=CULLING_MODE_ITEMS,
+        default="BACK",
         update=update_preview,
     )
     polygon_offset_enabled: bpy.props.BoolProperty(
@@ -667,6 +675,18 @@ class CMBExportSettings(bpy.types.PropertyGroup):
         name="ETC Compression",
         items=ETC_COMPRESSION_MODE_ITEMS,
         default="HIGH",
+    )
+    simplified_export_enabled: bpy.props.BoolProperty(
+        name="Simplified Export",
+        default=False,
+    )
+    simplified_export_mode: bpy.props.EnumProperty(
+        name="Mode",
+        items=(
+            ("ADULT", "Adult", ""),
+            ("CHILD", "Child", ""),
+        ),
+        default="ADULT",
     )
 
 

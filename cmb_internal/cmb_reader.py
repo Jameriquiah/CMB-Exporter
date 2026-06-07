@@ -204,7 +204,7 @@ class CmbMaterialInfo:
     vertex_lighting: bool
     is_fog_enabled: bool
     render_layer: int
-    face_culling: bool
+    face_culling: int
     polygon_offset_enabled: bool
     polygon_offset: int
     texture_mappers_used: int
@@ -660,7 +660,7 @@ def read_mats_info(data, header):
                 vertex_lighting=bool(data[material_offset + 0x01]),
                 is_fog_enabled=bool(data[material_offset + 0x02]),
                 render_layer=data[material_offset + 0x03],
-                face_culling=bool(data[material_offset + 0x04]),
+                face_culling=data[material_offset + 0x04],
                 polygon_offset_enabled=bool(data[material_offset + 0x05]),
                 polygon_offset=struct.unpack_from("<H", data, material_offset + 0x06)[0],
                 texture_mappers_used=_read_u32(data, material_offset + 0x08),
