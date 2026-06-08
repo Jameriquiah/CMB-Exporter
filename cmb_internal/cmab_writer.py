@@ -34,6 +34,25 @@ def _encode_cmab_texture(image, texture_format):
     return CmabTexture(name=_safe_texture_name(image.name), encoded=encoded)
 
 
+def _image_size(image):
+    return int(image.size[0]), int(image.size[1])
+
+
+def _validate_cmab_texture_sizes(slot0_image, images):
+    expected_width, expected_height = _image_size(slot0_image)
+    mismatched_images = []
+    for image in images:
+        width, height = _image_size(image)
+        if (width, height) != (expected_width, expected_height):
+            mismatched_images.append(f"{image.name} ({width}x{height})")
+
+    if mismatched_images:
+        raise CmabWriteError(
+            "CMAB textures have mismatched resolutions"
+            f"{expected_width}x{expected_height}: {', '.join(mismatched_images)}"
+        )
+
+
 def _write_string_table(writer, names):
     start = writer.offset
     writer.write_magic(b"STRT")
@@ -106,17 +125,15 @@ def write_cmab_file(
     channel_index=0,
 ):
     settings = material.cmb_settings
-    if not settings.cmab_texture_swap_enabled:
-        raise CmabWriteError("Active material has no CMAB texture swap images")
 
     images = []
     for index, frame in enumerate(settings.cmab_texture_swap_images):
         if frame.image is None:
-            raise CmabWriteError(f"CMAB texture swap image {index} is empty")
+            raise CmabWriteError(f"CMAB texture {index} is empty")
         images.append(frame.image)
 
     if not images:
-        raise CmabWriteError("Active material has no CMAB texture swap images")
+        raise CmabWriteError("Active material has no CMAB textures")
 
     textures = tuple(
         _encode_cmab_texture(image, settings.texture_format)

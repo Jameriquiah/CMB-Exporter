@@ -77,7 +77,7 @@ def _validate_cmab_count(context, export_settings):
 
     if len(cmab_materials) > 3:
         raise CmbMeshExportError(
-            "Model cannot have more than 3 CMAB texture swaps. "
+            "Model cannot have more than 3 CMAB materials. "
             f"Culprit material(s): {', '.join(cmab_materials)}"
         )
 
