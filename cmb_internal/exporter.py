@@ -11,7 +11,6 @@ from .textures import CmbTextureExportError, attach_textures_to_model
 class ExportOptions:
     filepath: str
     global_scale: float
-    etc_compression_mode: str = "HIGH"
     simplified_export: str = "OFF"
 
 
@@ -29,7 +28,6 @@ def export_cmb(context, options):
         model = attach_textures_to_model(
             model,
             context.blend_data,
-            etc_compression_mode=options.etc_compression_mode,
         )
     except (CmbMeshExportError, CmbSkeletonExportError, CmbTextureExportError) as exc:
         raise CMBExportError(str(exc)) from exc

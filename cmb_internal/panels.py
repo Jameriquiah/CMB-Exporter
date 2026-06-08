@@ -33,7 +33,7 @@ def draw_cmab_texture_swap_frame(layout, frame, index):
 
 def draw_cmab_texture_swap(layout, settings):
     box = layout.box().column()
-    box.prop(settings, "cmab_texture_swap_enabled", text="Export CMAB Texture Swap")
+    box.prop(settings, "cmab_texture_swap_enabled", text="Export CMAB")
     if not settings.cmab_texture_swap_enabled:
         return
 
@@ -214,7 +214,6 @@ class CMB_PT_sidebar(bpy.types.Panel):
         box = layout.box()
         box.label(text="Export")
         box.prop(settings, "filepath")
-        box.prop(settings, "etc_compression_mode")
         box.prop(settings, "simplified_export_enabled")
         if settings.simplified_export_enabled:
             box.prop(settings, "simplified_export_mode")

@@ -93,7 +93,7 @@ def _validate_texture_coord_mappings(model):
         )
 
 
-def attach_textures_to_model(model, bpy_data, etc_compression_mode="HIGH"):
+def attach_textures_to_model(model, bpy_data):
     _validate_texture_format_consistency(model)
     _validate_texture_coord_mappings(model)
 
@@ -128,7 +128,6 @@ def attach_textures_to_model(model, bpy_data, etc_compression_mode="HIGH"):
                     width,
                     height,
                     texture_format,
-                    etc_compression_mode=etc_compression_mode,
                 )
             except CmbTextureEncodeError as exc:
                 raise CmbTextureExportError(

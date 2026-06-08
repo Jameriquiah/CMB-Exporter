@@ -1,4 +1,8 @@
 from dataclasses import dataclass
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
 
 from .cmb_constants import PicaDataType, PicaTextureFormat
 
@@ -16,12 +20,6 @@ class EncodedTexture:
     data_type: int
     is_etc1: int = 0
     mipmap_count: int = 1
-
-
-@dataclass(frozen=True)
-class EtcCompressionProfile:
-    individual_radius: int
-    differential_candidate_limit: int
 
 
 TEXTURE_FORMATS = {
@@ -47,15 +45,21 @@ ETC1_MODIFIER_TABLES = (
     (47, 183, -47, -183),
 )
 
-ETC_COMPRESSION_PROFILES = {
-    "FAST": EtcCompressionProfile(individual_radius=0, differential_candidate_limit=0),
-    "HIGH": EtcCompressionProfile(individual_radius=1, differential_candidate_limit=48),
-}
-
 ETC_BLOCK_SIZE = 4
 PICA_TILE_SIZE = 8
 ETC_COLOR_BLOCK_BYTES = 8
 ETC_ALPHA_BLOCK_BYTES = 8
+
+
+def _external_compressor_path():
+    tools_dir = Path(__file__).resolve().parent / "tools"
+    if sys.platform == "win32":
+        return tools_dir / "windows" / "etc1compress.exe"
+    if sys.platform == "darwin":
+        return tools_dir / "macos" / "etc1compress"
+    if sys.platform.startswith("linux"):
+        return tools_dir / "linux" / "etc1compress"
+    raise CmbTextureEncodeError(f"No bundled ETC1 compressor for platform: {sys.platform}")
 
 
 def _clamp_u8(value):
@@ -442,18 +446,67 @@ def _encode_etc1a4_alpha_block(block):
     return value.to_bytes(8, "little")
 
 
-def _etc_compression_settings(compression_mode):
-    return ETC_COMPRESSION_PROFILES.get(
-        compression_mode,
-        ETC_COMPRESSION_PROFILES["HIGH"],
-    )
+def _expected_etc_size(width, height, texture_format):
+    padded_width = ((width + PICA_TILE_SIZE - 1) // PICA_TILE_SIZE) * PICA_TILE_SIZE
+    padded_height = ((height + PICA_TILE_SIZE - 1) // PICA_TILE_SIZE) * PICA_TILE_SIZE
+    block_count = (padded_width // ETC_BLOCK_SIZE) * (padded_height // ETC_BLOCK_SIZE)
+    bytes_per_block = ETC_COLOR_BLOCK_BYTES
+    if texture_format == "ETC1A4":
+        bytes_per_block += ETC_ALPHA_BLOCK_BYTES
+    return block_count * bytes_per_block
 
 
-def _encode_etc_texture(pixels, width, height, texture_format, compression_mode):
+def _rgba8_bytes(pixels):
+    raw = bytearray()
+    for pixel in pixels:
+        raw.extend(_rgba8(pixel))
+    return bytes(raw)
+
+
+def _encode_etc_texture_external(pixels, width, height, texture_format):
+    executable = _external_compressor_path()
+    if not executable.exists():
+        raise CmbTextureEncodeError(f"Bundled ETC1 compressor not found: {executable}")
+
+    if sys.platform != "win32":
+        try:
+            executable.chmod(executable.stat().st_mode | 0o755)
+        except OSError:
+            pass
+
+    cli_format = "etc1a4" if texture_format == "ETC1A4" else "etc1"
+    with tempfile.TemporaryDirectory(prefix="cmb_etc1_") as temp_dir:
+        input_path = Path(temp_dir) / "input.rgba"
+        output_path = Path(temp_dir) / "output.bin"
+        input_path.write_bytes(_rgba8_bytes(pixels))
+        result = subprocess.run(
+            [
+                str(executable),
+                cli_format,
+                str(width),
+                str(height),
+                str(input_path),
+                str(output_path),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            message = (result.stderr or result.stdout or "unknown compressor error").strip()
+            raise CmbTextureEncodeError(f"ETC1 compressor failed: {message}")
+        encoded = output_path.read_bytes()
+
+    expected_size = _expected_etc_size(width, height, texture_format)
+    if len(encoded) != expected_size:
+        raise CmbTextureEncodeError(
+            f"ETC1 compressor wrote {len(encoded)} bytes, expected {expected_size}"
+        )
+    return encoded
+
+
+def _encode_etc_texture(pixels, width, height, texture_format):
     encoded = bytearray()
-    profile = _etc_compression_settings(compression_mode)
-    individual_radius = profile.individual_radius
-    candidate_limit = profile.differential_candidate_limit
     for block_x, block_y in _etc_block_order(width, height):
         block = [
             [
@@ -464,11 +517,11 @@ def _encode_etc_texture(pixels, width, height, texture_format, compression_mode)
         ]
         if texture_format == "ETC1A4":
             encoded.extend(_encode_etc1a4_alpha_block(block))
-        encoded.extend(_encode_etc1_block(block, individual_radius, candidate_limit))
+        encoded.extend(_encode_etc1_block(block, 1, 48))
     return bytes(encoded)
 
 
-def encode_texture_pixels(pixels, width, height, texture_format, etc_compression_mode="HIGH"):
+def encode_texture_pixels(pixels, width, height, texture_format):
     if texture_format not in TEXTURE_FORMATS:
         raise CmbTextureEncodeError(f"Unknown texture format: {texture_format}")
 
@@ -482,12 +535,11 @@ def encode_texture_pixels(pixels, width, height, texture_format, etc_compression
     transparent = (0.0, 0.0, 0.0, 0.0)
     if texture_format in {"ETC1", "ETC1A4"}:
         encoded = bytearray(
-            _encode_etc_texture(
+            _encode_etc_texture_external(
                 pixels,
                 width,
                 height,
                 texture_format,
-                etc_compression_mode,
             )
         )
     elif texture_format == "L4":

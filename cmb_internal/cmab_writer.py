@@ -20,7 +20,7 @@ def _patch_u32(writer, offset, value):
     writer.patch_u32(offset, value)
 
 
-def _encode_cmab_texture(image, texture_format, etc_compression_mode):
+def _encode_cmab_texture(image, texture_format):
     pixels, width, height = _image_pixels(image)
     try:
         encoded = encode_texture_pixels(
@@ -28,7 +28,6 @@ def _encode_cmab_texture(image, texture_format, etc_compression_mode):
             width,
             height,
             texture_format,
-            etc_compression_mode=etc_compression_mode,
         )
     except CmbTextureEncodeError as exc:
         raise CmabWriteError(f"Image '{image.name}' texture export failed: {exc}") from exc
@@ -105,7 +104,6 @@ def write_cmab_file(
     filepath,
     material_index,
     channel_index=0,
-    etc_compression_mode="HIGH",
 ):
     settings = material.cmb_settings
     if not settings.cmab_texture_swap_enabled:
@@ -121,7 +119,7 @@ def write_cmab_file(
         raise CmabWriteError("Active material has no CMAB texture swap images")
 
     textures = tuple(
-        _encode_cmab_texture(image, settings.texture_format, etc_compression_mode)
+        _encode_cmab_texture(image, settings.texture_format)
         for image in images
     )
 

@@ -48,7 +48,6 @@ def _export_options_for_settings(export_settings, filepath="cmb_model.cmb"):
     return ExportOptions(
         filepath=filepath,
         global_scale=1.0,
-        etc_compression_mode=export_settings.etc_compression_mode,
         simplified_export=(
             export_settings.simplified_export_mode
             if export_settings.simplified_export_enabled
@@ -125,7 +124,6 @@ def _write_cmabs_for_model(model, directory, export_settings):
             filepath,
             material_index=material_index,
             channel_index=0,
-            etc_compression_mode=export_settings.etc_compression_mode,
         )
 
 

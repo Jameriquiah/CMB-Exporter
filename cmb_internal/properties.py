@@ -133,12 +133,6 @@ CMB_MATERIAL_TYPE_ITEMS = (
     ("CMB", "CMB", ""),
 )
 
-ETC_COMPRESSION_MODE_ITEMS = (
-    ("FAST", "Fast", "Fast ETC compression with lower color search quality"),
-    ("HIGH", "High Quality", "Slow ETC compression with the best current color search quality"),
-)
-
-
 def update_material_preset(self, context):
     apply_preset_to_settings(self, self.material_preset)
     sync_preview(self, context)
@@ -682,11 +676,6 @@ class CMBExportSettings(bpy.types.PropertyGroup):
         name="Export Path",
         subtype="FILE_PATH",
         default="",
-    )
-    etc_compression_mode: bpy.props.EnumProperty(
-        name="ETC Compression",
-        items=ETC_COMPRESSION_MODE_ITEMS,
-        default="HIGH",
     )
     simplified_export_enabled: bpy.props.BoolProperty(
         name="Simplified Export",
