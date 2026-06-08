@@ -6,6 +6,44 @@ from .properties import is_cmb_material_settings
 from .texture_slots import TEXTURE_SLOT_INDICES, texture_slot_attr
 
 
+def draw_cmab_texture_swap_frame(layout, frame, index):
+    box = layout.box().column()
+    box.template_ID(frame, "image", new="image.new", open="image.open")
+
+    row = box.row()
+    buttons = row.row(align=True)
+
+    visualize = buttons.operator("cmb.visualize_cmab_texture", text="Visualize", icon="VIEW_CAMERA")
+    visualize.index = index
+
+    add = buttons.operator("cmb.add_cmab_texture", text="", icon="ADD")
+    add.index = index + 1
+
+    remove = buttons.operator("cmb.remove_cmab_texture", text="", icon="REMOVE")
+    remove.index = index
+
+    move_up = buttons.operator("cmb.move_cmab_texture", text="", icon="TRIA_UP")
+    move_up.index = index
+    move_up.offset = -1
+
+    move_down = buttons.operator("cmb.move_cmab_texture", text="", icon="TRIA_DOWN")
+    move_down.index = index
+    move_down.offset = 1
+
+
+def draw_cmab_texture_swap(layout, settings):
+    box = layout.box().column()
+    box.prop(settings, "cmab_texture_swap_enabled", text="Export CMAB Texture Swap")
+    if not settings.cmab_texture_swap_enabled:
+        return
+
+    for index, frame in enumerate(settings.cmab_texture_swap_images):
+        draw_cmab_texture_swap_frame(box, frame, index)
+
+    add = box.operator("cmb.add_cmab_texture", text="Add Texture")
+    add.index = len(settings.cmab_texture_swap_images)
+
+
 def draw_texture_tab(layout, settings):
     box = layout.box()
     box.label(text="Textures")
@@ -36,6 +74,8 @@ def draw_texture_tab(layout, settings):
         row.prop(
             settings, texture_slot_attr(slot_index, "wrap_v"), text=f"Wrap V {slot_index}"
         )
+
+    draw_cmab_texture_swap(layout, settings)
 
 
 def draw_combiner_tab(layout, settings):

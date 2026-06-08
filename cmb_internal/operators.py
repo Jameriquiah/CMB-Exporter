@@ -4,9 +4,13 @@ from pathlib import Path
 import bpy
 
 from .blender_context import active_material_from_context
+from .cmab_writer import CmabWriteError, write_cmab_file
 from .exporter import CMBExportError, ExportOptions, export_cmb
 from .material_presets import apply_preset_to_settings
-from .viewport import sync_cmb_material_preview
+from .mesh import CmbMeshExportError, build_cmb_model_from_scene
+from .skeleton import CmbSkeletonExportError
+from .textures import CmbTextureExportError
+from .viewport import sync_cmb_material_preview, visualize_cmb_material_preview_texture
 from .properties import is_cmb_material_settings
 
 
@@ -19,8 +23,13 @@ def _selected_armature(context):
 
 
 def _safe_filename_stem(name):
-    stem = INVALID_FILENAME_CHARS.sub("_", name).strip(" .")
-    return stem or "cmb_model"
+    return _clean_filename_stem(name) or "cmb_model"
+
+
+def _clean_filename_stem(name):
+    if not name:
+        return ""
+    return INVALID_FILENAME_CHARS.sub("_", name).strip(" .")
 
 
 def _filepath_with_armature_name(filepath, armature):
@@ -33,6 +42,91 @@ def _filepath_with_armature_name(filepath, armature):
         directory = path.parent
 
     return str(directory / f"{_safe_filename_stem(armature.name)}.cmb")
+
+
+def _export_options_for_settings(export_settings, filepath="cmb_model.cmb"):
+    return ExportOptions(
+        filepath=filepath,
+        global_scale=1.0,
+        etc_compression_mode=export_settings.etc_compression_mode,
+        simplified_export=(
+            export_settings.simplified_export_mode
+            if export_settings.simplified_export_enabled
+            else "OFF"
+        ),
+    )
+
+
+def _cmb_model_for_context(context, export_settings):
+    return build_cmb_model_from_scene(
+        context,
+        _export_options_for_settings(export_settings, "cmab_material_lookup.cmb"),
+    )
+
+
+def _validate_cmab_count(context, export_settings):
+    model = _cmb_model_for_context(context, export_settings)
+    cmab_materials = []
+    for cmb_material in model.materials:
+        material = bpy.data.materials.get(cmb_material.name)
+        if (
+            material is not None
+            and is_cmb_material_settings(material.cmb_settings)
+            and material.cmb_settings.cmab_texture_swap_enabled
+        ):
+            cmab_materials.append(cmb_material.name)
+
+    if len(cmab_materials) > 3:
+        raise CmbMeshExportError(
+            "Model cannot have more than 3 CMAB texture swaps. "
+            f"Culprit material(s): {', '.join(cmab_materials)}"
+        )
+
+    return model
+
+
+def _slot0_texture_filename_stem(material):
+    image = material.cmb_settings.texture_image
+    if image is None:
+        raise CmabWriteError("CMAB material must have a texture in slot 0")
+
+    stem = _clean_filename_stem(image.name.rsplit(".", 1)[0])
+    if not stem:
+        raise CmabWriteError(
+            f"CMAB material '{material.name}' slot 0 texture has no usable filename"
+        )
+    return stem
+
+
+def _cmab_filepath(directory, material):
+    return directory / f"{_slot0_texture_filename_stem(material)}.cmab"
+
+
+def _write_cmabs_for_model(model, directory, export_settings):
+    written_paths = set()
+    for material_index, cmb_material in enumerate(model.materials):
+        material = bpy.data.materials.get(cmb_material.name)
+        if (
+            material is None
+            or not is_cmb_material_settings(material.cmb_settings)
+            or not material.cmb_settings.cmab_texture_swap_enabled
+        ):
+            continue
+
+        filepath = _cmab_filepath(directory, material)
+        normalized_path = filepath.resolve()
+        if normalized_path in written_paths:
+            raise CmabWriteError(
+                f"Multiple CMAB materials would export to '{filepath.name}'"
+            )
+        written_paths.add(normalized_path)
+        write_cmab_file(
+            material,
+            filepath,
+            material_index=material_index,
+            channel_index=0,
+            etc_compression_mode=export_settings.etc_compression_mode,
+        )
 
 
 def _principled_base_color(material):
@@ -206,6 +300,85 @@ class CMB_OT_refresh_all_material_presets(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class CMB_OT_add_cmab_texture(bpy.types.Operator):
+    bl_idname = "cmb.add_cmab_texture"
+    bl_label = "Add CMAB Texture"
+    bl_options = {"REGISTER", "UNDO"}
+
+    index: bpy.props.IntProperty(default=-1)
+
+    def execute(self, context):
+        material = active_material_from_context(context)
+        if material is None:
+            return {"CANCELLED"}
+
+        textures = material.cmb_settings.cmab_texture_swap_images
+        insert_index = len(textures) if self.index < 0 else min(self.index, len(textures))
+        textures.add()
+        textures.move(len(textures) - 1, insert_index)
+        return {"FINISHED"}
+
+
+class CMB_OT_remove_cmab_texture(bpy.types.Operator):
+    bl_idname = "cmb.remove_cmab_texture"
+    bl_label = "Remove CMAB Texture"
+    bl_options = {"REGISTER", "UNDO"}
+
+    index: bpy.props.IntProperty()
+
+    def execute(self, context):
+        material = active_material_from_context(context)
+        if material is None:
+            return {"CANCELLED"}
+
+        textures = material.cmb_settings.cmab_texture_swap_images
+        if 0 <= self.index < len(textures):
+            textures.remove(self.index)
+        return {"FINISHED"}
+
+
+class CMB_OT_move_cmab_texture(bpy.types.Operator):
+    bl_idname = "cmb.move_cmab_texture"
+    bl_label = "Move CMAB Texture"
+    bl_options = {"REGISTER", "UNDO"}
+
+    index: bpy.props.IntProperty()
+    offset: bpy.props.IntProperty()
+
+    def execute(self, context):
+        material = active_material_from_context(context)
+        if material is None:
+            return {"CANCELLED"}
+
+        textures = material.cmb_settings.cmab_texture_swap_images
+        new_index = self.index + self.offset
+        if 0 <= self.index < len(textures) and 0 <= new_index < len(textures):
+            textures.move(self.index, new_index)
+        return {"FINISHED"}
+
+
+class CMB_OT_visualize_cmab_texture(bpy.types.Operator):
+    bl_idname = "cmb.visualize_cmab_texture"
+    bl_label = "Visualize CMAB Texture"
+    bl_options = {"REGISTER", "UNDO"}
+
+    index: bpy.props.IntProperty()
+
+    def execute(self, context):
+        material = active_material_from_context(context)
+        if material is None:
+            return {"CANCELLED"}
+
+        settings = material.cmb_settings
+        if 0 <= self.index < len(settings.cmab_texture_swap_images):
+            if settings.cmab_texture_swap_images[self.index].image is not None:
+                visualize_cmb_material_preview_texture(
+                    material,
+                    settings.cmab_texture_swap_images[self.index].image,
+                )
+        return {"FINISHED"}
+
+
 class CMB_OT_export(bpy.types.Operator):
     bl_idname = "export_scene.cmb"
     bl_label = "Export CMB"
@@ -225,20 +398,19 @@ class CMB_OT_export(bpy.types.Operator):
         elif not filepath.lower().endswith(".cmb"):
             filepath += ".cmb"
 
-        options = ExportOptions(
-            filepath=filepath,
-            global_scale=1.0,
-            etc_compression_mode=settings.etc_compression_mode,
-            simplified_export=(
-                settings.simplified_export_mode
-                if settings.simplified_export_enabled
-                else "OFF"
-            ),
-        )
+        options = _export_options_for_settings(settings, filepath)
 
         try:
+            model = _validate_cmab_count(context, settings)
             export_cmb(context, options)
-        except CMBExportError as exc:
+            _write_cmabs_for_model(model, Path(filepath).parent, settings)
+        except (
+            CMBExportError,
+            CmabWriteError,
+            CmbMeshExportError,
+            CmbSkeletonExportError,
+            CmbTextureExportError,
+        ) as exc:
             self.report({"ERROR"}, str(exc))
             return {"CANCELLED"}
 
@@ -251,6 +423,10 @@ classes = (
     CMB_OT_create_material,
     CMB_OT_convert_all_materials,
     CMB_OT_refresh_all_material_presets,
+    CMB_OT_add_cmab_texture,
+    CMB_OT_remove_cmab_texture,
+    CMB_OT_move_cmab_texture,
+    CMB_OT_visualize_cmab_texture,
     CMB_OT_export,
 )
 

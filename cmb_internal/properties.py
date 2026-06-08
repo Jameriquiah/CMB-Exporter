@@ -259,6 +259,13 @@ class CMBTexEnvStageSettings(bpy.types.PropertyGroup):
     )
 
 
+class CMABTextureImageSlot(bpy.types.PropertyGroup):
+    image: bpy.props.PointerProperty(
+        name="Image",
+        type=bpy.types.Image,
+    )
+
+
 class CMBMaterialSettings(bpy.types.PropertyGroup):
     material_type: bpy.props.EnumProperty(
         name="Material Type",
@@ -275,6 +282,11 @@ class CMBMaterialSettings(bpy.types.PropertyGroup):
         name="CMB Material",
         default=False,
     )
+    cmab_texture_swap_enabled: bpy.props.BoolProperty(
+        name="CMAB Texture Swap",
+        default=False,
+    )
+    cmab_texture_swap_images: bpy.props.CollectionProperty(type=CMABTextureImageSlot)
     fragment_lighting: bpy.props.BoolProperty(
         name="Fragment Lighting",
         default=False,
@@ -692,6 +704,7 @@ class CMBExportSettings(bpy.types.PropertyGroup):
 
 classes = (
     CMBTexEnvStageSettings,
+    CMABTextureImageSlot,
     CMBMaterialSettings,
     CMBExportSettings,
 )

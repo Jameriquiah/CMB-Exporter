@@ -343,6 +343,22 @@ def sync_cmb_material_preview(material, force=False):
     material.update_tag()
 
 
+def visualize_cmb_material_preview_texture(material, image):
+    if material is None or image is None:
+        return
+
+    sync_cmb_material_preview(material)
+    tree = material.node_tree
+    if tree is None:
+        return
+
+    for node in tree.nodes:
+        if node.type == "TEX_IMAGE" and node.label == "CMB Texture 0":
+            node.image = image
+            material.update_tag()
+            return
+
+
 def sync_cmb_material_preview_from_settings(settings, context=None, force=False):
     material = getattr(settings, "id_data", None)
     sync_cmb_material_preview(material, force=force)
