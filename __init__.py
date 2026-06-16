@@ -14,6 +14,7 @@ import importlib
 MODULE_NAMES = (
     "cmb_internal.properties",
     "cmb_internal.operators",
+    "cmb_internal.importer",
     "cmb_internal.panels",
 )
 
