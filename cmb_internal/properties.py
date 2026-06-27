@@ -90,15 +90,23 @@ COMBINER_ITEMS = (
     ("REPLACE", "Replace", ""),
     ("MODULATE", "Modulate", ""),
     ("ADD", "Add", ""),
+    ("ADD_SIGNED", "Add Signed", ""),
+    ("INTERPOLATE", "Interpolate", ""),
+    ("SUBTRACT", "Subtract", ""),
+    ("DOT3_RGB", "Dot3 RGB", ""),
+    ("DOT3_RGBA", "Dot3 RGBA", ""),
     ("MULT_ADD", "MultAdd", ""),
+    ("ADD_MULT", "AddMult", ""),
 )
 
 SOURCE_ITEMS = (
     ("PRIMARY_COLOR", "Primary Color", ""),
     ("FRAGMENT_PRIMARY_COLOR_DMP", "Fragment Primary Color", ""),
+    ("FRAGMENT_SECONDARY_COLOR_DMP", "Fragment Secondary Color", ""),
     ("TEXTURE0", "Texture 0", ""),
     ("TEXTURE1", "Texture 1", ""),
     ("TEXTURE2", "Texture 2", ""),
+    ("TEXTURE3", "Texture 3", ""),
     ("PREVIOUS_BUFFER_DMP", "Previous Buffer", ""),
     ("CONSTANT", "Constant", ""),
     ("PREVIOUS", "Previous", ""),
@@ -106,12 +114,28 @@ SOURCE_ITEMS = (
 
 OPERAND_RGB_ITEMS = (
     ("SRC_COLOR", "Color", ""),
+    ("ONE_MINUS_SRC_COLOR", "One Minus Color", ""),
     ("SRC_ALPHA", "Alpha", ""),
+    ("ONE_MINUS_SRC_ALPHA", "One Minus Alpha", ""),
+    ("SRC_R_DMP", "Red", ""),
+    ("ONE_MINUS_SRC_R_DMP", "One Minus Red", ""),
+    ("SRC_G_DMP", "Green", ""),
+    ("ONE_MINUS_SRC_G_DMP", "One Minus Green", ""),
+    ("SRC_B_DMP", "Blue", ""),
+    ("ONE_MINUS_SRC_B_DMP", "One Minus Blue", ""),
 )
 
 OPERAND_ALPHA_ITEMS = (
     ("SRC_ALPHA", "Alpha", ""),
+    ("ONE_MINUS_SRC_ALPHA", "One Minus Alpha", ""),
     ("SRC_COLOR", "Color", ""),
+    ("ONE_MINUS_SRC_COLOR", "One Minus Color", ""),
+    ("SRC_R_DMP", "Red", ""),
+    ("ONE_MINUS_SRC_R_DMP", "One Minus Red", ""),
+    ("SRC_G_DMP", "Green", ""),
+    ("ONE_MINUS_SRC_G_DMP", "One Minus Green", ""),
+    ("SRC_B_DMP", "Blue", ""),
+    ("ONE_MINUS_SRC_B_DMP", "One Minus Blue", ""),
 )
 
 SCALE_ITEMS = (

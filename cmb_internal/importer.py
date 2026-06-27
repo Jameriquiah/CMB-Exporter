@@ -550,9 +550,9 @@ def _read_texture_coord(reader, offset):
     }
 
 
-def _read_env_stages(reader, mats_offset, material_count):
+def _read_env_stages(reader, mats_offset, material_count, env_end_offset):
     env_offset = mats_offset + 12 + material_count * MATERIAL_RECORD_SIZE
-    env_count = (reader.u32(mats_offset + 4) - (12 + material_count * MATERIAL_RECORD_SIZE)) // 40
+    env_count = (env_end_offset - env_offset) // 40
     stages = []
     for index in range(max(0, env_count)):
         offset = env_offset + index * 40
@@ -560,10 +560,10 @@ def _read_env_stages(reader, mats_offset, material_count):
     return tuple(stages)
 
 
-def _read_materials(reader, mats_offset, textures, texture_data_offset):
+def _read_materials(reader, mats_offset, tex_offset, textures, texture_data_offset):
     _check_magic(reader, mats_offset, MATS_MAGIC)
     count = reader.u32(mats_offset + 8)
-    env_stages = _read_env_stages(reader, mats_offset, count)
+    env_stages = _read_env_stages(reader, mats_offset, count, tex_offset)
     materials = []
     for material_index in range(count):
         start = mats_offset + 12 + material_index * MATERIAL_RECORD_SIZE
@@ -1014,7 +1014,7 @@ def import_cmb(filepath):
     name, pointers = _read_header(reader)
     bones = _read_bones(reader, pointers["skl"])
     textures = _read_textures(reader, pointers["tex"])
-    materials = _read_materials(reader, pointers["mats"], textures, pointers["textures"])
+    materials = _read_materials(reader, pointers["mats"], pointers["tex"], textures, pointers["textures"])
     entries, shp_offset = _read_mesh_entries(reader, pointers["sklm"])
     shapes = _read_shapes(reader, shp_offset, pointers["indices"])
     vatr_streams = _read_vatr_streams(reader, pointers["vatr"])
