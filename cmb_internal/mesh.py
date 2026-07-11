@@ -350,6 +350,45 @@ def _normal_matrix(matrix):
         return matrix3
 
 
+def _normal_is_valid(normal):
+    return (
+        normal.length_squared > 0.000001
+        and isfinite(normal.x)
+        and isfinite(normal.y)
+        and isfinite(normal.z)
+    )
+
+
+def _ensure_split_normals(mesh):
+    calc_normals_split = getattr(mesh, "calc_normals_split", None)
+    if calc_normals_split is not None:
+        calc_normals_split()
+
+
+def _corner_normal(mesh, loop_index):
+    corner_normals = getattr(mesh, "corner_normals", None)
+    if corner_normals is None or loop_index >= len(corner_normals):
+        return None
+    return corner_normals[loop_index].vector
+
+
+def _export_normal(normal_matrix, mesh, loop_index, loop, vertex, loop_triangle):
+    normals = (
+        _corner_normal(mesh, loop_index),
+        loop.normal,
+        vertex.normal,
+        loop_triangle.normal,
+    )
+    for normal in normals:
+        if normal is None:
+            continue
+        transformed = normal_matrix @ normal
+        if _normal_is_valid(transformed):
+            transformed.normalize()
+            return float(transformed.x), float(transformed.y), float(transformed.z)
+    return 0.0, 0.0, 1.0
+
+
 def _append_object_mesh(
     skeleton,
     obj,
@@ -365,6 +404,7 @@ def _append_object_mesh(
     mesh = obj.data
 
     mesh.calc_loop_triangles()
+    _ensure_split_normals(mesh)
     uv_layers = _uv_layers(mesh)
     color_layer = _active_color_layer(mesh)
     object_materials = _object_material_indices(obj, materials, material_lookup)
@@ -385,15 +425,14 @@ def _append_object_mesh(
 
             position = mesh_to_armature @ vertex.co
             position = position * options.global_scale
-            normal = normal_matrix @ loop.normal
-            normal.normalize()
+            normal = _export_normal(normal_matrix, mesh, loop_index, loop, vertex, loop_triangle)
             bone_indices, bone_weights = _vertex_influences(
                 obj, vertex, bone_lookup
             )
 
             cmb_vertex = CmbVertex(
                 position=(float(position.x), float(position.y), float(position.z)),
-                normal=(float(normal.x), float(normal.y), float(normal.z)),
+                normal=normal,
                 color=_loop_color(mesh, color_layer, loop_index, loop.vertex_index),
                 uv0=_loop_uv(uv_layers[0], loop_index),
                 uv1=_loop_uv(uv_layers[1], loop_index),
