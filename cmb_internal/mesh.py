@@ -194,12 +194,24 @@ def _explicit_material_order(material):
     return int(match.group(1))
 
 
+def _dummy_material(index):
+    return replace(
+        default_material(),
+        name=f"__cmb_dummy_material_{index:02d}",
+        vertex_lighting=True,
+        diffuse_color=(255, 255, 255, 255),
+        ambient_color=(255, 255, 255, 255),
+    )
+
+
 def _sort_materials_by_explicit_order(materials, primitives):
     explicit_orders = {}
     for index, material in enumerate(materials):
         order = _explicit_material_order(material)
         if order is None:
             continue
+        if order < 0:
+            raise CmbMeshExportError(f"CMB material order cannot be negative: '{material.name}'")
         if order in explicit_orders:
             other = materials[explicit_orders[order]].name
             raise CmbMeshExportError(
@@ -208,27 +220,39 @@ def _sort_materials_by_explicit_order(materials, primitives):
         explicit_orders[order] = index
 
     if not explicit_orders:
-        return tuple(materials), tuple(primitives)
+        return tuple(materials), tuple(primitives), ()
 
-    sorted_old_indices = sorted(
-        range(len(materials)),
-        key=lambda index: (
-            _explicit_material_order(materials[index]) is None,
-            _explicit_material_order(materials[index])
-            if _explicit_material_order(materials[index]) is not None
-            else index,
-            index,
-        ),
-    )
-    old_to_new = {
-        old_index: new_index for new_index, old_index in enumerate(sorted_old_indices)
-    }
-    sorted_materials = tuple(materials[old_index] for old_index in sorted_old_indices)
+    old_to_new = {}
+    slot_count = max(max(explicit_orders) + 1, len(materials))
+    ordered_materials = [None] * slot_count
+
+    for order, old_index in explicit_orders.items():
+        ordered_materials[order] = materials[old_index]
+        old_to_new[old_index] = order
+
+    next_slot = 0
+    for old_index, material in enumerate(materials):
+        if old_index in old_to_new:
+            continue
+        while next_slot < len(ordered_materials) and ordered_materials[next_slot] is not None:
+            next_slot += 1
+        if next_slot >= len(ordered_materials):
+            ordered_materials.append(None)
+        ordered_materials[next_slot] = material
+        old_to_new[old_index] = next_slot
+        next_slot += 1
+
+    dummy_indices = []
+    for index, material in enumerate(ordered_materials):
+        if material is None:
+            ordered_materials[index] = _dummy_material(index)
+            dummy_indices.append(index)
+
     remapped_primitives = tuple(
         replace(primitive, material_index=old_to_new[primitive.material_index])
         for primitive in primitives
     )
-    return sorted_materials, remapped_primitives
+    return tuple(ordered_materials), remapped_primitives, tuple(dummy_indices)
 
 
 def _sort_primitives_by_draw_order(materials, primitives):
@@ -493,9 +517,29 @@ def build_cmb_model_from_scene(context, options):
     if not vertices or not primitives:
         raise CmbMeshExportError("Mesh objects did not produce any triangles")
 
-    sorted_materials, remapped_primitives = _sort_materials_by_explicit_order(
+    sorted_materials, remapped_primitives, dummy_material_indices = _sort_materials_by_explicit_order(
         materials, primitives
     )
+    if dummy_material_indices:
+        dummy_vertex_index = len(vertices)
+        vertices.append(
+            CmbVertex(
+                position=(0.0, 0.0, 0.0),
+                normal=(0.0, 0.0, 1.0),
+                uv0=(0.0, 0.0),
+                bone_indices=(0, 0, 0, 0),
+                bone_weights=(100, 0, 0, 0),
+            )
+        )
+        remapped_primitives = tuple(remapped_primitives) + tuple(
+            CmbPrimitive(
+                indices=(dummy_vertex_index, dummy_vertex_index, dummy_vertex_index),
+                material_index=material_index,
+                visibility_id=47,
+                mesh_name=f"__cmb_dummy_material_{material_index:02d}",
+            )
+            for material_index in dummy_material_indices
+        )
     sorted_primitives = _sort_primitives_by_draw_order(
         sorted_materials, remapped_primitives
     )
