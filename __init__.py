@@ -1,7 +1,7 @@
 bl_info = {
     "name": "CMB Exporter",
     "author": "Jameriquiah",
-    "version": (1, 2),
+    "version": (1, 3),
     "blender": (3, 5, 0),
     "location": "3D View > Sidebar > CMB",
     "description": "Export models as CMB files for OOT3D",
