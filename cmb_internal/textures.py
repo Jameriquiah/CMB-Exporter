@@ -1,4 +1,5 @@
 from dataclasses import dataclass, replace
+from pathlib import Path
 
 from .texture_encoder import CmbTextureEncodeError, EncodedTexture, encode_texture_pixels
 from .texture_slots import iter_texture_slot_values, texture_slot_attr
@@ -14,6 +15,52 @@ class CmbTexture:
     encoded: EncodedTexture
 
 
+def _png_color_info(data):
+    if len(data) < 26 or data[:8] != b"\x89PNG\r\n\x1a\n" or data[12:16] != b"IHDR":
+        return None
+    return data[24], data[25]
+
+
+def _image_png_color_info(image):
+    packed_file = getattr(image, "packed_file", None)
+    if packed_file is not None:
+        return _png_color_info(packed_file.data[:26])
+
+    filepath_from_user = getattr(image, "filepath_from_user", None)
+    filepath = filepath_from_user() if filepath_from_user is not None else image.filepath
+    if not filepath:
+        return None
+    try:
+        return _png_color_info(Path(filepath).read_bytes()[:26])
+    except OSError:
+        return None
+
+
+def _linear_to_srgb(value):
+    value = max(0.0, min(1.0, value))
+    if value <= 0.0031308:
+        return value * 12.92
+    return 1.055 * (value ** (1.0 / 2.4)) - 0.055
+
+
+def _image_needs_srgb_pixels(image):
+    color_info = _image_png_color_info(image)
+    if color_info is None:
+        return False
+    bit_depth, color_type = color_info
+    colorspace = image.colorspace_settings.name.lower()
+    return bit_depth > 8 and color_type in {2, 6} and "srgb" in colorspace
+
+
+def _display_pixel(pixel):
+    return (
+        _linear_to_srgb(pixel[0]),
+        _linear_to_srgb(pixel[1]),
+        _linear_to_srgb(pixel[2]),
+        pixel[3],
+    )
+
+
 def _image_pixels(image):
     if image.size[0] <= 0 or image.size[1] <= 0:
         raise CmbTextureExportError(f"Image '{image.name}' has invalid dimensions")
@@ -27,6 +74,8 @@ def _image_pixels(image):
         tuple(values[offset : offset + 4])
         for offset in range(0, len(values), 4)
     ]
+    if _image_needs_srgb_pixels(image):
+        source_pixels = [_display_pixel(pixel) for pixel in source_pixels]
     pixels = [
         pixel
         for y in range(height - 1, -1, -1)
