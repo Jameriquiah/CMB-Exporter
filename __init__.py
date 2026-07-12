@@ -1,7 +1,7 @@
 bl_info = {
     "name": "CMB Exporter",
     "author": "Jameriquiah",
-    "version": (1, 3),
+    "version": (1, 2),
     "blender": (3, 5, 0),
     "location": "3D View > Sidebar > CMB",
     "description": "Export models as CMB files for OOT3D",
@@ -16,6 +16,7 @@ MODULE_NAMES = (
     "cmb_internal.operators",
     "cmb_internal.importer",
     "cmb_internal.panels",
+    "cmb_internal.3DS_Link_tool",
 )
 
 

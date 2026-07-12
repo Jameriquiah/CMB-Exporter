@@ -225,6 +225,22 @@ class CMB_PT_sidebar(bpy.types.Panel):
         box.operator("cmb.refresh_all_material_presets")
         box.operator("cmb.create_material")
 
+        box = layout.box()
+        box.label(text="Link Tools")
+        row = box.row(align=True)
+        row.operator("link3ds.edit_ready", text="Edit Ready")
+        row.operator("link3ds.export_ready", text="Export Ready")
+        box.prop(
+            context.scene,
+            "link3ds_optimize_weights_steps",
+            text="Optimize Weights Steps",
+        )
+
+        box.operator(
+            "link3ds.optimize_weights",
+            text="Optimize Weights",
+            icon="AUTOMERGE_ON",
+        )
 
 class MATERIAL_PT_cmb_material_settings(bpy.types.Panel):
     bl_label = "CMB Material"
