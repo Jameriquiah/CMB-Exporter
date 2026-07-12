@@ -16,6 +16,7 @@ MODULE_NAMES = (
     "cmb_internal.operators",
     "cmb_internal.importer",
     "cmb_internal.panels",
+    "cmb_internal.3DS_Link_tool",
 )
 
 
