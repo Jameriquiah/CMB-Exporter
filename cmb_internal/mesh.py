@@ -435,6 +435,7 @@ def _append_object_mesh(
     mesh_to_armature = skeleton.matrix_world.inverted() @ obj.matrix_world
     normal_matrix = _normal_matrix(mesh_to_armature)
     object_indices = []
+    force_weighted = bool(getattr(obj, "cmb_force_weighted", False))
 
     for loop_triangle in mesh.loop_triangles:
         if len(loop_triangle.loops) != 3:
@@ -488,6 +489,7 @@ def _append_object_mesh(
                     material_index=object_materials[0],
                     visibility_id=visibility_id,
                     mesh_name=obj.name,
+                    force_weighted=force_weighted,
                 )
             )
 

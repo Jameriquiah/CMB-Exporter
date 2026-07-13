@@ -225,6 +225,13 @@ class CMB_PT_sidebar(bpy.types.Panel):
         box.operator("cmb.refresh_all_material_presets")
         box.operator("cmb.create_material")
 
+        active_object = context.active_object
+        if active_object is not None and active_object.type == "MESH":
+            box = layout.box()
+            box.label(text="Meshes")
+            box.label(text=active_object.name, icon="MESH_DATA")
+            box.prop(active_object, "cmb_force_weighted")
+
         box = layout.box()
         box.label(text="Link Tools")
         row = box.row(align=True)

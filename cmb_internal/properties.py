@@ -733,9 +733,16 @@ def register():
         bpy.utils.register_class(cls)
     bpy.types.Material.cmb_settings = bpy.props.PointerProperty(type=CMBMaterialSettings)
     bpy.types.Scene.cmb_export_settings = bpy.props.PointerProperty(type=CMBExportSettings)
+    bpy.types.Object.cmb_force_weighted = bpy.props.BoolProperty(
+        name="Force Weighted",
+        description="Forces mesh to export as weighted, removes seams from showing on typically rigid meshes such as eyes or mouth.",
+        default=False,
+    )
 
 
 def unregister():
+    if hasattr(bpy.types.Object, "cmb_force_weighted"):
+        del bpy.types.Object.cmb_force_weighted
     if hasattr(bpy.types.Scene, "cmb_export_settings"):
         del bpy.types.Scene.cmb_export_settings
     if hasattr(bpy.types.Material, "cmb_settings"):

@@ -30,6 +30,7 @@ class CmbPrimitive:
     material_index: int = 0
     visibility_id: int = 0
     mesh_name: str = ""
+    force_weighted: bool = False
 
 
 @dataclass(frozen=True)

@@ -541,12 +541,27 @@ def _vertex_influence_count(vertex):
     return max(1, sum(1 for weight in vertex.bone_weights if weight > 0))
 
 
-def _shape_bone_dimension_from_palettes(vertices, palettes):
+def _shape_bone_dimension_from_palettes(vertices, palettes, force_weighted=False):
     max_influences = max(_vertex_influence_count(vertex) for vertex in vertices)
     max_palette_size = max((len(palette) for palette in palettes), default=1)
-    if max_palette_size == 1 and max_influences == 1:
+    if not force_weighted and max_palette_size == 1 and max_influences == 1:
         return 1
     return max(2, max_influences)
+
+
+def _forced_weighted_palette(model, palette):
+    if len(palette) != 1:
+        return palette
+
+    primary_bone = palette[0]
+    parent_index = model.bones[primary_bone].parent_index if 0 <= primary_bone < len(model.bones) else -1
+    if parent_index >= 0 and parent_index != primary_bone:
+        return (primary_bone, parent_index)
+    if primary_bone != 0:
+        return (primary_bone, 0)
+    if len(model.bones) > 1:
+        return (0, 1)
+    return (primary_bone, primary_bone)
 
 
 def _transform_point(matrix, point):
@@ -641,19 +656,26 @@ def _build_shape_write_info(model):
             _shape_bone_palette(model.vertices[source_index] for source_index in primitive_indices)
             for primitive_indices in primitive_chunks
         ]
+        if primitive.force_weighted:
+            chunk_palettes = [
+                _forced_weighted_palette(model, palette)
+                for palette in chunk_palettes
+            ]
         source_vertices = [
             model.vertices[source_index]
             for primitive_indices in primitive_chunks
             for source_index in primitive_indices
         ]
-        bone_dimension = _shape_bone_dimension_from_palettes(source_vertices, chunk_palettes)
+        bone_dimension = _shape_bone_dimension_from_palettes(
+            source_vertices, chunk_palettes, force_weighted=primitive.force_weighted
+        )
 
         local_vertices = []
         local_chunk_indices = []
         prms = []
 
         for primitive_indices, bone_palette in zip(primitive_chunks, chunk_palettes):
-            skinning_mode = 0 if len(bone_palette) == 1 and bone_dimension == 1 else 2
+            skinning_mode = 0 if not primitive.force_weighted and len(bone_palette) == 1 and bone_dimension == 1 else 2
             local_lookup = {}
             local_indices = []
             for source_index in primitive_indices:
@@ -685,7 +707,7 @@ def _build_shape_write_info(model):
                 f"Mesh '{primitive.mesh_name}' has {len(local_vertices)} vertices; U16 indices support at most 65535"
             )
 
-        shape_skinning_mode = 0 if all(prm.skinning_mode == 0 for prm in prms) else 2
+        shape_skinning_mode = 0 if not primitive.force_weighted and all(prm.skinning_mode == 0 for prm in prms) else 2
         shape_palette = chunk_palettes[0] if shape_skinning_mode == 0 and chunk_palettes else (0,)
         bounds_min, bounds_max = _bounds_from_vertices(local_vertices)
         has_uvs = tuple(
