@@ -138,13 +138,34 @@ def _active_color_layer(mesh):
     return None
 
 
+def _color_value_to_rgba8(value):
+    color = getattr(value, "color", None)
+    if color is None:
+        color = getattr(value, "color_srgb", None)
+    if color is None:
+        color = getattr(value, "vector", None)
+    if color is None:
+        color = getattr(value, "value", None)
+    if color is None:
+        return None
+
+    channels = tuple(float(channel) for channel in color)
+    if len(channels) == 3:
+        channels = channels + (1.0,)
+    elif len(channels) == 1:
+        channels = (channels[0], channels[0], channels[0], 1.0)
+    elif len(channels) < 4:
+        channels = channels + (1.0,) * (4 - len(channels))
+    return _rgba_float_to_rgba8(channels[:4])
+
+
 def _loop_color(mesh, color_layer, loop_index, vertex_index):
     if color_layer is None:
         return None
 
     domain = getattr(color_layer, "domain", "CORNER")
     index = vertex_index if domain == "POINT" else loop_index
-    return _rgba_float_to_rgba8(color_layer.data[index].color)
+    return _color_value_to_rgba8(color_layer.data[index])
 
 
 def _loop_uv(uv_layer, loop_index):
