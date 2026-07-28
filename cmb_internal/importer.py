@@ -817,14 +817,31 @@ def _read_position(reader, offset, index):
     return reader.vec3(base)
 
 
-def _read_normal(reader, offset, index, scale):
-    base = offset + index * 3
-    return reader.s8(base) * scale, reader.s8(base + 1) * scale, reader.s8(base + 2) * scale
+def _read_normal(reader, offset, index, vertex_list):
+    data_type = vertex_list.data_type
+    scale = vertex_list.scale
+    if data_type == PicaDataType.F32:
+        base = offset + index * 12
+        return reader.vec3(base)
+    if data_type == PicaDataType.S8:
+        base = offset + index * 3
+        return reader.s8(base) * scale, reader.s8(base + 1) * scale, reader.s8(base + 2) * scale
+    if data_type == PicaDataType.S16:
+        base = offset + index * 6
+        return reader.s16(base) * scale, reader.s16(base + 2) * scale, reader.s16(base + 4) * scale
+    raise CmbImportError(f"Unsupported normal data type: {data_type:#x}")
 
 
-def _read_uv(reader, offset, index, scale):
-    base = offset + index * 4
-    return reader.s16(base) * scale, reader.s16(base + 2) * scale
+def _read_uv(reader, offset, index, vertex_list):
+    data_type = vertex_list.data_type
+    scale = vertex_list.scale
+    if data_type == PicaDataType.F32:
+        base = offset + index * 8
+        return reader.vec2(base)
+    if data_type == PicaDataType.S16:
+        base = offset + index * 4
+        return reader.s16(base) * scale, reader.s16(base + 2) * scale
+    raise CmbImportError(f"Unsupported UV data type: {data_type:#x}")
 
 
 def _read_byte_tuple(reader, offset, index, size):
@@ -887,9 +904,9 @@ def _shape_geometry(reader, shape, vatr_offset, vatr_streams, bone_matrices):
         bool(shape.flags & SEPD_FLAGS_HAS_UV2),
     )
     positions = [_read_position(reader, positions_offset, index) for index in range(vertex_count)]
-    normals = [_read_normal(reader, normals_offset, index, lists[1].scale) for index in range(vertex_count)]
+    normals = [_read_normal(reader, normals_offset, index, lists[1]) for index in range(vertex_count)]
     uvs = [
-        [_read_uv(reader, uv_offsets[uv_index], index, lists[3 + uv_index].scale) for index in range(vertex_count)]
+        [_read_uv(reader, uv_offsets[uv_index], index, lists[3 + uv_index]) for index in range(vertex_count)]
         if has_uv[uv_index]
         else None
         for uv_index in range(3)
