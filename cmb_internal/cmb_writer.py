@@ -793,9 +793,13 @@ def _build_vatr_layout(shapes):
     )
 
 
-def _mshs_draw_entries(model, shapes):
+def _mshs_draw_entries(model, shapes, shape_index_remap=None):
+    remap = shape_index_remap or {}
     return sorted(
-        enumerate(shapes),
+        (
+            (remap.get(shape_index, shape_index), shape)
+            for shape_index, shape in enumerate(shapes)
+        ),
         key=lambda item: (
             model.materials[item[1].primitive.material_index].render_layer,
             item[1].primitive.visibility_id,
@@ -803,9 +807,46 @@ def _mshs_draw_entries(model, shapes):
     )
 
 
-def _write_mshs_chunk(writer, model, shapes):
+def _shape_reuse_key(shape):
+    prms_key = tuple(
+        (tuple(prms.indices), tuple(prms.bone_palette), prms.skinning_mode)
+        for prms in shape.prms
+    )
+    return (
+        shape.vertices,
+        prms_key,
+        shape.bounds_min,
+        shape.bounds_max,
+        shape.center,
+        shape.bone_palette,
+        shape.bone_dimension,
+        shape.skinning_mode,
+        shape.has_colors,
+        shape.uv_scales,
+        shape.has_uvs,
+    )
+
+
+def _deduplicated_shapes(shapes):
+    unique_shapes = []
+    shape_index_remap = {}
+    key_to_unique_index = {}
+
+    for shape_index, shape in enumerate(shapes):
+        key = _shape_reuse_key(shape)
+        unique_index = key_to_unique_index.get(key)
+        if unique_index is None:
+            unique_index = len(unique_shapes)
+            key_to_unique_index[key] = unique_index
+            unique_shapes.append(shape)
+        shape_index_remap[shape_index] = unique_index
+
+    return tuple(unique_shapes), shape_index_remap
+
+
+def _write_mshs_chunk(writer, model, shapes, shape_index_remap=None):
     start, size_offset = _start_chunk(writer, MSHS_MAGIC)
-    draw_entries = _mshs_draw_entries(model, shapes)
+    draw_entries = _mshs_draw_entries(model, shapes, shape_index_remap)
     opaque_mesh_count = sum(
         1
         for _shape_index, shape in draw_entries
@@ -957,8 +998,9 @@ def _write_sklm_chunk(writer, model, shapes, vatr_layout):
     mshs_rel_offset = writer.reserve_u32()
     shp_rel_offset = writer.reserve_u32()
 
-    mshs_start = _write_mshs_chunk(writer, model, shapes)
-    shp_start = _write_shp_chunk(writer, shapes, vatr_layout)
+    unique_shapes, shape_index_remap = _deduplicated_shapes(shapes)
+    mshs_start = _write_mshs_chunk(writer, model, shapes, shape_index_remap)
+    shp_start = _write_shp_chunk(writer, unique_shapes, vatr_layout)
 
     writer.patch_u32(mshs_rel_offset, mshs_start - start)
     writer.patch_u32(shp_rel_offset, shp_start - start)
