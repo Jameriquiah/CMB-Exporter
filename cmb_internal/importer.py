@@ -841,6 +841,9 @@ def _read_uv(reader, offset, index, vertex_list):
     if data_type == PicaDataType.S16:
         base = offset + index * 4
         return reader.s16(base) * scale, reader.s16(base + 2) * scale
+    if data_type == PicaDataType.U8:
+        base = offset + index * 2
+        return reader.u8(base) * scale, reader.u8(base + 1) * scale
     raise CmbImportError(f"Unsupported UV data type: {data_type:#x}")
 
 
