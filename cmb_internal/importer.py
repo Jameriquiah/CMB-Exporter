@@ -873,9 +873,22 @@ def _transform_normal(matrix, normal):
     return float(transformed.x), float(transformed.y), float(transformed.z)
 
 
+def _mode1_bone_index(reader, shape, prms, vertex_index, bone_indices_offset):
+    if not prms.palette:
+        return 0
+
+    local_index = _read_byte_tuple(
+        reader, bone_indices_offset, vertex_index, shape.bone_dimension
+    )[0]
+    return prms.palette[local_index] if local_index < len(prms.palette) else 0
+
+
 def _source_vertex_weights(reader, shape, prms, vertex_index, bone_indices_offset, bone_weights_offset, weighted):
     if prms.skinning_mode == 0:
         return ((prms.palette[0] if prms.palette else 0, 1.0),)
+
+    if prms.skinning_mode == 1:
+        return ((_mode1_bone_index(reader, shape, prms, vertex_index, bone_indices_offset), 1.0),)
 
     if not weighted:
         return ((prms.palette[0] if prms.palette else 0, 1.0),)
@@ -928,12 +941,6 @@ def _shape_geometry(reader, shape, vatr_offset, vatr_streams, bone_matrices):
     faces = []
 
     for prms in shape.prms:
-        rigid_bone_index = prms.palette[0] if prms.skinning_mode == 0 and prms.palette else None
-        rigid_matrix = (
-            bone_matrices[rigid_bone_index]
-            if rigid_bone_index is not None and 0 <= rigid_bone_index < len(bone_matrices)
-            else None
-        )
         vertex_lookup = {}
         for index in range(0, len(prms.indices), 3):
             triangle = prms.indices[index : index + 3]
@@ -946,9 +953,21 @@ def _shape_geometry(reader, shape, vatr_offset, vatr_streams, bone_matrices):
                 if imported_index is None:
                     position = Vector(positions[source_index])
                     normal = normals[source_index]
-                    if rigid_matrix is not None:
-                        position = rigid_matrix @ position
-                        normal = _transform_normal(rigid_matrix, normal)
+                    influences = _source_vertex_weights(
+                        reader,
+                        shape,
+                        prms,
+                        source_index,
+                        bone_indices_offset,
+                        bone_weights_offset,
+                        weighted,
+                    )
+                    if prms.skinning_mode in (0, 1):
+                        bone_index = influences[0][0]
+                        if 0 <= bone_index < len(bone_matrices):
+                            bone_matrix = bone_matrices[bone_index]
+                            position = bone_matrix @ position
+                            normal = _transform_normal(bone_matrix, normal)
 
                     imported_index = len(imported_positions)
                     vertex_lookup[source_index] = imported_index
@@ -959,17 +978,7 @@ def _shape_geometry(reader, shape, vatr_offset, vatr_streams, bone_matrices):
                             imported_uvs[uv_index].append(uv_values[source_index])
                     if colors is not None:
                         imported_colors.append(colors[source_index])
-                    weights.append(
-                        _source_vertex_weights(
-                            reader,
-                            shape,
-                            prms,
-                            source_index,
-                            bone_indices_offset,
-                            bone_weights_offset,
-                            weighted,
-                        )
-                    )
+                    weights.append(influences)
                 face.append(imported_index)
             faces.append(tuple(face))
 
